@@ -2,59 +2,110 @@ using UnityEngine;
 
 public class EnvironmentSimulator : MonoBehaviour
 {
+    public ChamberController chamberController;
+
     [Header("Temperature")]
-    public float baseTemperature = 24f;
-    public float temperatureAmplitude = 3f;
-    public float temperatureSpeed = 0.5f;
-    public float currentTemperature;
+    public float ambientTemperature = 24f;
+    public float currentTemperature = 24f;
+
+    public float heaterTemperatureGain = 8f;
+    public float fanCoolingEffect = 3f;
+    public float temperatureResponseSpeed = 0.3f;
 
     [Header("Humidity")]
     public float baseHumidity = 55f;
-    public float humidityAmplitude = 10f;
-    public float humiditySpeed = 0.25f;
-    public float currentHumidity;
+    public float currentHumidity = 55f;
+    public float humidityDropPerDegree = 1.5f;
 
     [Header("Air Velocity")]
-    public float baseAirVelocity = 0.3f;
-    public float airVelocityAmplitude = 0.2f;
-    public float airVelocitySpeed = 0.8f;
-    public float currentAirVelocity;
+    public float currentAirVelocity = 0f;
+    public float maximumAirVelocity = 1.2f;
+    public float airVelocityResponseSpeed = 2f;
 
-    private Renderer cubeRenderer;
+    private Renderer sensorRenderer;
 
     void Start()
     {
-        cubeRenderer = GetComponent<Renderer>();
+        sensorRenderer = GetComponent<Renderer>();
+
+        currentTemperature = ambientTemperature;
+        currentHumidity = baseHumidity;
     }
 
     void Update()
     {
-        currentTemperature =
-            baseTemperature +
-            Mathf.Sin(Time.time * temperatureSpeed) *
-            temperatureAmplitude;
+        if (chamberController == null)
+            return;
 
-        currentHumidity =
-            baseHumidity +
-            Mathf.Sin(Time.time * humiditySpeed) *
-            humidityAmplitude;
+        UpdateTemperature();
+        UpdateAirVelocity();
+        UpdateHumidity();
+        UpdateVisual();
+    }
 
-        currentAirVelocity =
-            baseAirVelocity +
-            Mathf.Sin(Time.time * airVelocitySpeed) *
-            airVelocityAmplitude;
+    void UpdateTemperature()
+    {
+        float targetTemperature = ambientTemperature;
+
+        if (chamberController.heaterOn)
+        {
+            targetTemperature += heaterTemperatureGain;
+        }
+
+        float fanCooling =
+            (chamberController.fanSpeed / 100f)
+            * fanCoolingEffect;
+
+        targetTemperature -= fanCooling;
+
+        currentTemperature = Mathf.MoveTowards(
+            currentTemperature,
+            targetTemperature,
+            temperatureResponseSpeed * Time.deltaTime
+        );
+    }
+
+    void UpdateAirVelocity()
+    {
+        float targetVelocity =
+            (chamberController.fanSpeed / 100f)
+            * maximumAirVelocity;
+
+        currentAirVelocity = Mathf.Lerp(
+            currentAirVelocity,
+            targetVelocity,
+            airVelocityResponseSpeed * Time.deltaTime
+        );
+    }
+
+    void UpdateHumidity()
+    {
+        float temperatureDifference =
+            currentTemperature - ambientTemperature;
+
+        float targetHumidity =
+            baseHumidity -
+            temperatureDifference * humidityDropPerDegree;
+
+        currentHumidity = Mathf.Lerp(
+            currentHumidity,
+            targetHumidity,
+            0.5f * Time.deltaTime
+        );
+    }
+
+    void UpdateVisual()
+    {
+        if (sensorRenderer == null)
+            return;
 
         if (currentTemperature < 23f)
-        {
-            cubeRenderer.material.color = Color.blue;
-        }
-        else if (currentTemperature > 25f)
-        {
-            cubeRenderer.material.color = Color.red;
-        }
+            sensorRenderer.material.color = Color.blue;
+
+        else if (currentTemperature > 27f)
+            sensorRenderer.material.color = Color.red;
+
         else
-        {
-            cubeRenderer.material.color = Color.green;
-        }
+            sensorRenderer.material.color = Color.green;
     }
 }
