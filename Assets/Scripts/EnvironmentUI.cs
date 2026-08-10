@@ -3,7 +3,7 @@ using TMPro;
 
 public class EnvironmentUI : MonoBehaviour
 {
-    public TemperatureSimulator environmentSimulator;
+    public EnvironmentSimulator environmentSimulator;
 
     public TMP_Text temperatureText;
     public TMP_Text humidityText;

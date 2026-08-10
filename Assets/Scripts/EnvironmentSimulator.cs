@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class TemperatureSimulator : MonoBehaviour
+public class EnvironmentSimulator : MonoBehaviour
 {
     [Header("Temperature")]
     public float baseTemperature = 24f;
