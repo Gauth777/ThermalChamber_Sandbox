@@ -4,80 +4,81 @@ public class EnvironmentSimulator : MonoBehaviour
 {
     public ChamberController chamberController;
 
-    [Header("Temperature")]
-    public float ambientTemperature = 24f;
+    [Header("Live Chamber Values")]
     public float currentTemperature = 24f;
+    public float currentHumidity = 55f;
+    public float currentAirVelocity = 0f;
 
-    public float heaterTemperatureGain = 8f;
-    public float fanCoolingEffect = 3f;
-    public float temperatureResponseSpeed = 0.3f;
+    [Header("Air")]
+    public float maximumAirVelocity = 1.2f;
 
     [Header("Humidity")]
     public float baseHumidity = 55f;
-    public float currentHumidity = 55f;
+    public float ambientTemperature = 24f;
     public float humidityDropPerDegree = 1.5f;
 
-    [Header("Air Velocity")]
-    public float currentAirVelocity = 0f;
-    public float maximumAirVelocity = 1.2f;
-    public float airVelocityResponseSpeed = 2f;
-
+    private ThermalZone[] thermalZones;
     private Renderer sensorRenderer;
 
     void Start()
     {
+        // Find all thermal tiles in the chamber
+        thermalZones = FindObjectsOfType<ThermalZone>();
+
+        // Get renderer of the EnvironmentSensor cube
         sensorRenderer = GetComponent<Renderer>();
 
+        // Automatically find ChamberController if not assigned manually
+        if (chamberController == null)
+        {
+            chamberController = FindObjectOfType<ChamberController>();
+        }
+
+        // Initialize values
         currentTemperature = ambientTemperature;
         currentHumidity = baseHumidity;
+        currentAirVelocity = 0f;
     }
 
     void Update()
     {
+        UpdateAverageTemperature();
+        UpdateAirVelocity();
+        UpdateHumidity();
+        UpdateSensorColor();
+    }
+
+    // Calculate average temperature of all thermal zones
+    void UpdateAverageTemperature()
+    {
+        if (thermalZones == null || thermalZones.Length == 0)
+            return;
+
+        float totalTemperature = 0f;
+
+        foreach (ThermalZone zone in thermalZones)
+        {
+            totalTemperature += zone.temperature;
+        }
+
+        currentTemperature =
+            totalTemperature / thermalZones.Length;
+    }
+
+    // Fan speed controls displayed air velocity
+    void UpdateAirVelocity()
+    {
         if (chamberController == null)
             return;
 
-        UpdateTemperature();
-        UpdateAirVelocity();
-        UpdateHumidity();
-        UpdateVisual();
+        float fanStrength =
+            chamberController.fanSpeed / 100f;
+
+        currentAirVelocity =
+            fanStrength * maximumAirVelocity;
     }
 
-    void UpdateTemperature()
-    {
-        float targetTemperature = ambientTemperature;
-
-        if (chamberController.heaterOn)
-        {
-            targetTemperature += heaterTemperatureGain;
-        }
-
-        float fanCooling =
-            (chamberController.fanSpeed / 100f)
-            * fanCoolingEffect;
-
-        targetTemperature -= fanCooling;
-
-        currentTemperature = Mathf.MoveTowards(
-            currentTemperature,
-            targetTemperature,
-            temperatureResponseSpeed * Time.deltaTime
-        );
-    }
-
-    void UpdateAirVelocity()
-    {
-        float targetVelocity =
-            (chamberController.fanSpeed / 100f)
-            * maximumAirVelocity;
-
-        currentAirVelocity = Mathf.Lerp(
-            currentAirVelocity,
-            targetVelocity,
-            airVelocityResponseSpeed * Time.deltaTime
-        );
-    }
-
+    // Approximate RH response to average chamber temperature
     void UpdateHumidity()
     {
         float temperatureDifference =
@@ -92,20 +93,60 @@ public class EnvironmentSimulator : MonoBehaviour
             targetHumidity,
             0.5f * Time.deltaTime
         );
+
+        currentHumidity = Mathf.Clamp(
+            currentHumidity,
+            0f,
+            100f
+        );
     }
 
-    void UpdateVisual()
+    // Change sensor cube colour according to average temperature
+    void UpdateSensorColor()
     {
         if (sensorRenderer == null)
             return;
 
-        if (currentTemperature < 23f)
-            sensorRenderer.material.color = Color.blue;
+        Color coolColor =
+            new Color(0.35f, 0.55f, 0.70f);
 
-        else if (currentTemperature > 27f)
-            sensorRenderer.material.color = Color.red;
+        Color neutralColor =
+            new Color(0.65f, 0.70f, 0.60f);
 
+        Color warmColor =
+            new Color(0.90f, 0.55f, 0.30f);
+
+        Color targetColor;
+
+        if (currentTemperature <= 24f)
+        {
+            float t = Mathf.InverseLerp(
+                20f,
+                24f,
+                currentTemperature
+            );
+
+            targetColor = Color.Lerp(
+                coolColor,
+                neutralColor,
+                t
+            );
+        }
         else
-            sensorRenderer.material.color = Color.green;
+        {
+            float t = Mathf.InverseLerp(
+                24f,
+                32f,
+                currentTemperature
+            );
+
+            targetColor = Color.Lerp(
+                neutralColor,
+                warmColor,
+                t
+            );
+        }
+
+        sensorRenderer.material.color = targetColor;
     }
 }
