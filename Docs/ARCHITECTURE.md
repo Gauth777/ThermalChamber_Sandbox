@@ -31,8 +31,8 @@ Temperature is not physically clamped to the heatmap range; colors saturate outs
 Existing MonoBehaviour names, serialized actuator fields and GUIDs remain. Old heatOutput/rate fields
 are retained for serialization but no longer drive the new power model. Existing AddHeat explicitly
 accepts a Celsius increment for compatibility. Add/move/remove sources or grid topology in Edit Mode,
-then reload the scene. Runtime source discovery is intentionally not continuous.
-The generated scene retains FBX scale and uses imported bounds for a configurable field.
+then reload the scene. Generated scenes use explicit EngineeringLayout references and rectangular grid adjacency. Legacy MainScene retains discovery fallback. Runtime source discovery is intentionally not continuous.
+The generated scene retains FBX scale and uses chamber_base plus named XPS wall inner faces for the field. Whole-model bounds are not used for the grid.
 Verify chamber interior bounds, floor height, meters, rotor pivot/axis and source positions in Unity.
 The generator uses a 4x4 grid; edit cells/neighborDistance and effective capacities for other resolutions.
 All simulation sources and zones currently belong to one chamber per loaded scene.

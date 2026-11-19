@@ -1,3 +1,7 @@
+# Integration-readiness update
+
+27 pure C# tests now pass (including seven name/footprint checks). Roslyn syntax parsing also passed for all 21 current project C# files; this is not Unity API binding or compilation. New Editor readiness tests are supplied but NOT executed here. Follow [the Windows checklist](WINDOWS_VALIDATION_CHECKLIST.md).
+
 # Validation status — 19 November 2026
 ## Actually executed
 The pure C# ThermalField/ExperimentSession/EnvironmentalReading sources were compiled by the installed

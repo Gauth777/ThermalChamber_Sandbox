@@ -8,13 +8,14 @@ public static class ParticipantRoomBuilder
     [MenuItem("Thermal Twin/Create Participant Office")]
     public static void Create()
     {
+        if(EditorApplication.isPlayingOrWillChangePlaymode) throw new System.InvalidOperationException("[TT-SCENE] Exit Play Mode.");
         if(!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
-        if(File.Exists(ScenePath)) return;
+        if(File.Exists(ScenePath)) { ThermalEditorAssets.RegisterScenes(); return; }
+        var setup=EditorSceneManager.GetSceneManagerSetup();
+        try {
         var scene=EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);
         // Independent 5 x 4 x 2.7 metre placeholder, not engineering chamber geometry.
-        var material=new Material(Shader.Find("Standard"));
-        material.color=new Color(.75f,.73f,.68f);
-        AssetDatabase.CreateAsset(material,"Assets/Materials/ParticipantOffice.mat");
+        var material=ThermalEditorAssets.Material("Assets/Materials/ParticipantOffice.mat",new Color(.75f,.73f,.68f));
         Box("Floor",new Vector3(0,-.05f,0),new Vector3(5,.1f,4),material);
         Box("Back wall",new Vector3(0,1.35f,2),new Vector3(5,2.7f,.1f),material);
         Box("Side wall",new Vector3(-2.5f,1.35f,0),new Vector3(.1f,2.7f,4),material);
@@ -30,13 +31,16 @@ public static class ParticipantRoomBuilder
         camera.AddComponent<Camera>(); camera.AddComponent<AudioListener>();
         camera.transform.position=new Vector3(1.8f,1.6f,-1.7f);
         camera.transform.LookAt(new Vector3(0,1,.7f));
-        camera.AddComponent<InspectionCamera>().distance=3;
+        var inspection=camera.AddComponent<InspectionCamera>(); inspection.distance=3; inspection.reservedLeftPixels=0;
         camera.AddComponent<ParticipantRoomNavigation>();
         var light=new GameObject("Daylight").AddComponent<Light>();
         light.type=LightType.Directional; light.intensity=.9f; light.transform.rotation=Quaternion.Euler(50,-20,0);
         RenderSettings.ambientLight=new Color(.65f,.65f,.65f);
-        EditorSceneManager.SaveScene(scene,ScenePath);
-        AssetDatabase.SaveAssets();
+        ThermalTwinValidation.ValidateOpenScene();
+        if(!EditorSceneManager.SaveScene(scene,ScenePath)) throw new System.IO.IOException("[TT-SCENE] Could not save ParticipantOffice.");
+        AssetDatabase.SaveAssets(); ThermalEditorAssets.RegisterScenes();
+        Debug.Log("[TT-SCENE] ParticipantOffice saved and registered.");
+        } catch { EditorSceneManager.RestoreSceneManagerSetup(setup); throw; }
     }
     static void Box(string name,Vector3 position,Vector3 scale,Material material)
     {

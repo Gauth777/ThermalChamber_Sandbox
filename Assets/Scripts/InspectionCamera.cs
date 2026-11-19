@@ -2,6 +2,7 @@ using UnityEngine;
 public class InspectionCamera : MonoBehaviour
 {
     public Vector3 target;
+    public float reservedLeftPixels=365;
     public float distance = 12, yaw = 40, pitch = 25;
     Renderer selected;
     Camera view;
@@ -10,12 +11,12 @@ public class InspectionCamera : MonoBehaviour
         view = GetComponent<Camera>();
         Vector3 forward = transform.forward;
         yaw = transform.eulerAngles.y;
-        pitch = transform.eulerAngles.x;
+        pitch = Mathf.DeltaAngle(0,transform.eulerAngles.x);
         target = transform.position + forward * distance;
     }
     void LateUpdate()
     {
-        if (!view || Input.mousePosition.x < 365) return;
+        if (!view || Input.mousePosition.x < reservedLeftPixels) return;
         if (Input.GetMouseButton(1))
         {
             yaw += Input.GetAxis("Mouse X")*4;

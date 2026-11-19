@@ -31,6 +31,13 @@ class CoreTests
         Check("localized source conserves specified total watts",delegate {var f=Pair(); f.DepositPower(new double[]{0,1},2,500); Equal(f.PowerWatts[0]+f.PowerWatts[1],500); True(f.PowerWatts[0]>f.PowerWatts[1]);});
         Check("source outside field contributes no power",delegate {var f=Pair(); f.DepositPower(new double[]{3,4},2,500); Equal(f.PowerWatts[0]+f.PowerWatts[1],0);});
         Check("invalid source rejected",delegate {Reject(delegate {Pair().DepositPower(new double[]{0,1},0,80);}); Reject(delegate {Pair().DepositPower(null,1,80);});});
+        Check("FBX namespace and duplicate suffix normalization",delegate {True(ChamberLayoutRules.Normalize("Model::IR_Heater_01.001")=="ir_heater_01"); True(ChamberLayoutRules.Normalize("root|Fan_02_Blade_03")=="fan_02_blade_03");});
+        Check("FBX matching preserves numbered identity",delegate {True(ChamberLayoutRules.Normalize("IR_Heater_010")!="ir_heater_01"); True(ChamberLayoutRules.Normalize("Fan_01_Housing_extra")!="fan_01_housing");});
+        Check("footprint uses inner wall faces",delegate {var r=ChamberLayoutRules.Interior(-2,2,-3,3,-1.8,1.8,-2.8,2.8); Equal(r[0],-1.8);Equal(r[3],2.8);});
+        Check("footprint cannot exceed named floor",delegate {var r=ChamberLayoutRules.Interior(-1,1,-1,1,-2,2,-2,2);Equal(r[0],-1);Equal(r[3],1);});
+        Check("inverted footprint rejected",delegate {Reject(delegate {ChamberLayoutRules.Interior(-1,1,-1,1,1,-1,-1,1);});});
+        Check("incorrect centimetre scale rejected",delegate {Reject(delegate {ChamberLayoutRules.Interior(-100,100,-100,100,-90,90,-90,90);});});
+        Check("nonfinite footprint rejected",delegate {Reject(delegate {ChamberLayoutRules.Interior(double.NaN,1,-1,1,-1,1,-1,1);});});
         Console.WriteLine(passed+" tests passed.");
     }
 }

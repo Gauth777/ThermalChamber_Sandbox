@@ -14,6 +14,7 @@ public class ThermalSimulation : MonoBehaviour, IEnvironmentDataSource
     [Min(0)] public float maximumAirVelocity = 1.2f;
     [Tooltip("Optional middleware component implementing IEnvironmentDataSource. Main-thread reads only.")]
     public MonoBehaviour hardwareProvider;
+    public EngineeringLayout configuredLayout;
     public readonly ExperimentSession Session = new ExperimentSession();
     public EnvironmentalReading Reading { get; private set; }
     public bool HasReading { get; private set; }
@@ -30,9 +31,9 @@ public class ThermalSimulation : MonoBehaviour, IEnvironmentDataSource
     void Start()
     {
         controller = GetComponent<ChamberController>();
-        Zones = FindObjectsOfType<ThermalZone>();
-        heaters = FindObjectsOfType<HeaterHeatSource>();
-        occupants = FindObjectsOfType<OccupantHeat>();
+        Zones = configuredLayout ? configuredLayout.zones : FindObjectsOfType<ThermalZone>();
+        heaters = configuredLayout ? configuredLayout.heaters : FindObjectsOfType<HeaterHeatSource>();
+        occupants = configuredLayout ? new[]{configuredLayout.occupant} : FindObjectsOfType<OccupantHeat>();
         Initialize();
     }
 
@@ -42,6 +43,10 @@ public class ThermalSimulation : MonoBehaviour, IEnvironmentDataSource
         { Warning = "No thermal zones found. Simulation unavailable."; HasReading = false; return; }
         try
         {
+            if(!controller || heaters==null || occupants==null) throw new InvalidOperationException("[TT-RUNTIME] Missing controller or source arrays.");
+            foreach(var z in Zones) if(!z) throw new InvalidOperationException("[TT-RUNTIME] Missing zone reference.");
+            foreach(var h in heaters) if(!h) throw new InvalidOperationException("[TT-RUNTIME] Missing heater reference.");
+            foreach(var o in occupants) if(!o) throw new InvalidOperationException("[TT-RUNTIME] Missing occupant reference.");
             bool[,] links = new bool[Zones.Length, Zones.Length];
             for (int i = 0; i < Zones.Length; i++)
                 for (int j = i+1; j < Zones.Length; j++)
@@ -60,11 +65,18 @@ public class ThermalSimulation : MonoBehaviour, IEnvironmentDataSource
                     links[i,j] = links[j,i] = aligned && nearest && delta.sqrMagnitude > .0001f &&
                         delta.sqrMagnitude <= neighborDistance * neighborDistance;
                 }
+            if(configuredLayout) {
+                int width=configuredLayout.columns;
+                if(width<1 || configuredLayout.rows<1 || width*configuredLayout.rows!=Zones.Length) throw new InvalidOperationException("[TT-RUNTIME] Invalid grid dimensions.");
+                for(int i=0;i<Zones.Length;i++) for(int j=0;j<Zones.Length;j++)
+                    links[i,j]=Math.Abs(i/width-j/width)+Math.Abs(i%width-j%width)==1;
+            }
             field = new ThermalField(Zones.Length, effectiveCapacityPerZoneJK, initialCelsius, links);
             weights = new double[Zones.Length];
             ResetExperiment();
+            Debug.Log("[TT-RUNTIME] Ready: "+Zones.Length+" zones, "+heaters.Length+" heaters. Simulation stopped.",this);
         }
-        catch (Exception ex) { Warning = ex.Message; HasReading = false; field = null; }
+        catch (Exception ex) { Warning = ex.Message; HasReading = false; field = null; Debug.LogError("[TT-RUNTIME] Initialization failed: "+ex.Message,this); }
     }
 
     void FixedUpdate()
@@ -74,7 +86,7 @@ public class ThermalSimulation : MonoBehaviour, IEnvironmentDataSource
         {
             for (int i = 0; i < Zones.Length; i++)
             {
-                if (!Zones[i]) throw new InvalidOperationException("A thermal zone was removed. Reload the scene.");
+                if (!Zones[i] || !Zones[i].isActiveAndEnabled) throw new InvalidOperationException("A thermal zone was removed. Reload the scene.");
                 field.Temperature[i] = Zones[i].temperature;
                 field.PowerWatts[i] = 0;
             }
@@ -94,7 +106,7 @@ public class ThermalSimulation : MonoBehaviour, IEnvironmentDataSource
             for (int i = 0; i < Zones.Length; i++) Zones[i].temperature = (float)field.Temperature[i];
             Session.Advance(Time.fixedDeltaTime);
         }
-        catch (Exception ex) { Warning = ex.Message; Session.Pause(); HasReading = false; }
+        catch (Exception ex) { Warning = ex.Message; Session.Pause(); HasReading = false; Debug.LogError("[TT-RUNTIME] Simulation paused: "+ex.Message,this); }
     }
 
     void DistributePower(Vector3 position, float radius, float watts)
@@ -140,7 +152,8 @@ public class ThermalSimulation : MonoBehaviour, IEnvironmentDataSource
 
     void PublishSimulation()
     {
-        if (field == null || !string.IsNullOrEmpty(Warning)) { HasReading = false; return; }
+        if (field == null) { Warning="[TT-RUNTIME] Thermal field unavailable. Check initialization errors."; HasReading=false; return; }
+        if (!string.IsNullOrEmpty(Warning)) { HasReading = false; return; }
         double t = field.Average;
         // Constant absolute moisture approximation using saturation vapour pressure (Magnus).
         double reference = Math.Exp(17.625 * initialCelsius / (243.04 + initialCelsius));
@@ -153,7 +166,8 @@ public class ThermalSimulation : MonoBehaviour, IEnvironmentDataSource
             HeaterOn = controller && controller.heaterOn,
             TimestampUtc = DateTime.UtcNow, Source = "Simulation: grid average / estimated RH / commanded fan airflow"
         };
-        HasReading = true;
+        HasReading = Reading.IsValid(DateTime.UtcNow);
+        if(!HasReading) Warning="[TT-RUNTIME] Invalid simulated environmental reading.";
     }
 
     public bool TryRead(out EnvironmentalReading reading) { reading = Reading; return HasReading; }
@@ -162,7 +176,9 @@ public class ThermalSimulation : MonoBehaviour, IEnvironmentDataSource
     public void StopExperiment() { Session.Stop(); if (controller) { controller.heaterOn = false; controller.fanSpeed = 0; } }
     public void ResetExperiment()
     {
-        StopExperiment(); Session.Reset(); Warning = "";
+        StopExperiment(); Session.Reset();
+        if(!ThermalField.Finite(initialCelsius)) { Warning="[TT-RUNTIME] Invalid initial temperature."; HasReading=false; return; }
+        Warning = "";
         if (field != null)
         {
             field.Reset(initialCelsius);
@@ -173,6 +189,7 @@ public class ThermalSimulation : MonoBehaviour, IEnvironmentDataSource
     }
     public void SwitchMode(DataMode mode)
     {
+        if(Session.Mode==mode) return;
         StopExperiment(); Session.SwitchMode(mode);
         HasReading = false; Reading = default(EnvironmentalReading); Warning = "";
         if (ResetOccurred != null) ResetOccurred();

@@ -35,6 +35,8 @@ public class ResearchDashboard : MonoBehaviour
     void OnGUI()
     {
         if (!sim || !controller) return;
+        Color previousBackground=GUI.backgroundColor;
+        bool previousEnabled=GUI.enabled;
         GUI.backgroundColor = new Color(.14f,.19f,.23f);
         GUILayout.BeginArea(new Rect(12,12,340,Mathf.Max(180,Screen.height-24)), GUI.skin.box);
         scroll = GUILayout.BeginScrollView(scroll);
@@ -79,10 +81,11 @@ public class ResearchDashboard : MonoBehaviour
         if (GUILayout.Button("Export displayed history to CSV")) Export();
         if (exportStatus.Length > 0) GUILayout.Label(exportStatus);
         if (Application.CanStreamedLevelBeLoaded("ParticipantOffice") && GUILayout.Button("Stop & open participant office"))
-        { sim.StopExperiment(); UnityEngine.SceneManagement.SceneManager.LoadScene("ParticipantOffice"); }
+        { sim.StopExperiment(); UnityEngine.SceneManagement.SceneManager.LoadSceneAsync("ParticipantOffice"); }
         GUILayout.Label("Camera: right drag orbit • middle drag pan\nWheel zoom • left click select • F frame");
         GUILayout.EndScrollView();
         GUILayout.EndArea();
+        GUI.backgroundColor=previousBackground; GUI.enabled=previousEnabled;
     }
     static double Value(EnvironmentalReading r, int series)
     { return series == 0 ? r.TemperatureCelsius : series == 1 ? r.RelativeHumidityPercent : r.AirVelocityMetresPerSecond; }
@@ -113,6 +116,7 @@ public class ResearchDashboard : MonoBehaviour
     {
         try
         {
+            Directory.CreateDirectory(Application.persistentDataPath);
             string file = Path.Combine(Application.persistentDataPath,"thermal-experiment-"+DateTime.UtcNow.ToString("yyyyMMdd-HHmmssfff")+".csv");
             using (var writer = new StreamWriter(file))
             {

@@ -3,7 +3,7 @@ Unity 2023.2.20f1 · built-in render pipeline · Windows desktop first.
 
 ## Current status
 This branch is an implemented engineering foundation, **not a validated industrial release**.
-The pure C# solver passes 20 executable regression tests. Unity compilation, imported model appearance,
+The pure C# solver passes 27 executable regression tests. Unity compilation, imported model appearance,
 Play Mode checks and Windows standalone build have not been executed in the implementation environment:
 Unity Editor/Hub was not found. Hardware and XR are not implemented.
 
@@ -42,6 +42,8 @@ Run from PowerShell:
 ```
 The core suite requires the Windows .NET Framework C# compiler, not a downloaded NuGet test runner.
 The batch command requires an installed, licensed Unity Editor and Windows build support.
+
+Start with the [Windows Unity validation checklist](Docs/WINDOWS_VALIDATION_CHECKLIST.md), including exact menu clicks and expected diagnostics.
 
 See [audit](Docs/AUDIT.md), [architecture and assumptions](Docs/ARCHITECTURE.md),
 [middleware contract](Docs/MIDDLEWARE.md) and [validation status](Docs/VALIDATION.md).
